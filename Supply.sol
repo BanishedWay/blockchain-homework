@@ -21,7 +21,7 @@ contract User {
         return name;
     }
 
-    // 获取用户余额
+    // 获取用户余额 TODO 对余额进行加密
     function getBalance() public view returns (uint) {
         return balance;
     }
@@ -280,6 +280,7 @@ contract Product {
 
     // 查看产品状态
     function getState() public view returns (string memory) {
+        string memory _state;
         if (state == State.RawMaterial) {
             return "RawMaterial";
         } else if (state == State.Producer) {
