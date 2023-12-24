@@ -245,7 +245,7 @@ contract Warehouse is User {
         amount++;
         balance -= price;
 
-        setWarehouse();
+        setWarehouse();// TODO 检查并截图
     }
 
     // 设置产品状态
