@@ -94,10 +94,10 @@ contract Producers is User {
     // 构造函数，注册生产者
     constructor(
         string memory _name,
-        address _address,
+        address _productAddress,
         uint _balance
     ) public User(_name, _balance) {
-        productAddress = _address;
+        productAddress = _productAddress;
     }
 
     // 事件：产品创建完成
@@ -205,9 +205,9 @@ contract Warehouse is User {
     constructor(
         string memory _name,
         uint _balance,
-        address _address
+        address _productAddress
     ) public User(_name, _balance) {
-        productAddress = _address;
+        productAddress = _productAddress;
     }
 
     // 修饰符：检查余额是否足够
