@@ -27,7 +27,7 @@ contract User {
 }
 
 contract RawMaterialSupplier is User {
-    uint price;
+    uint rawMaterialPrice;
     uint amount;
 
     // 构造函数，注册原材料
@@ -37,7 +37,7 @@ contract RawMaterialSupplier is User {
         uint _amount,
         uint _balance
     ) public User(_name, _balance) {
-        price = _price;
+        rawMaterialPrice = _price;
         amount = _amount;
     }
 
@@ -49,12 +49,12 @@ contract RawMaterialSupplier is User {
     );
 
     function getPrice() public view returns (uint) {
-        return price;
+        return rawMaterialPrice;
     }
 
     // 获取原材料信息
     function getRawMaterial() public view returns (string memory, uint, uint) {
-        return (name, price, amount);
+        return (name, rawMaterialPrice, amount);
     }
 
     // 修饰符：限制原材料数量
@@ -65,26 +65,26 @@ contract RawMaterialSupplier is User {
 
     // 修饰符：要求输入金额大于原材料价格*数量
     modifier requireSufficientMoney(uint _amount, uint _money) {
-        require(_money >= price * _amount, "Not enough money");
+        require(_money >= rawMaterialPrice * _amount, "Not enough money");
         _;
     }
 
     // 购买函数，其他用户通过购买函数购买原材料
     function buyRawMaterial(
         uint _amount,
-        uint money
+        uint _money
     )
-        public
+        external
         requireSufficientAmount(_amount)
-        requireSufficientMoney(_amount, money)
+        requireSufficientMoney(_amount, _money)
     {
         // 转账给供应商
-        balance += money;
+        balance += _money;
         // 原材料数量减少
         amount -= _amount;
 
         // 触发购买原材料事件
-        emit RawMaterialPurchased(name, _amount, money);
+        emit RawMaterialPurchased(name, _amount, _money);
     }
 }
 
