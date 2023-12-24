@@ -5,7 +5,7 @@ contract User {
     string name;
     uint balance;
 
-    event UserRegistered(string indexed userName, uint initialBalance);
+    event UserRegistered(string userName, uint initialBalance);
 
     // 构造函数，注册用户
     constructor(string memory _name, uint _balance) public {
@@ -21,7 +21,6 @@ contract User {
         return name;
     }
 
-    // 获取用户余额 TODO 对余额进行加密
     function getBalance() public view returns (uint) {
         return balance;
     }
@@ -44,7 +43,7 @@ contract RawMaterialSupplier is User {
 
     // 事件：购买原材料
     event RawMaterialPurchased(
-        string indexed materialName,
+        string materialName,
         uint amount,
         uint totalPrice
     );
@@ -91,6 +90,7 @@ contract RawMaterialSupplier is User {
 
 contract Producers is User {
     address productAddress;
+    address signer;
 
     // 构造函数，注册生产者
     constructor(
@@ -99,10 +99,14 @@ contract Producers is User {
         uint _balance
     ) public User(_name, _balance) {
         productAddress = _address;
+        signer = 0x0000000000000000000000000000000000000000;// TODO 完成签名
+        // r: 0x1234567890123456789012345678901234567890123456789012345678901234
+        // s: 0x5678901234567890123456789012345678901234567890123456789012345678
+        // v: 27
     }
 
     // 事件：产品创建完成
-    event ProductCreated(string indexed productName, uint price);
+    event ProductCreated(string productName, uint price);
 
     mapping(string => address) rawMaterialSuppliers;
 
@@ -141,7 +145,8 @@ contract Producers is User {
     modifier requireRawMaterialState() {
         Product product = Product(productAddress);
         require(
-            product.getState() == "RawMaterial",
+            keccak256(abi.encodePacked(product.getState())) ==
+                keccak256(abi.encodePacked("RawMaterial")),
             "Product not in raw material state"
         );
         _;
@@ -182,8 +187,8 @@ contract Producers is User {
     // 生产函数，用户调用改函数，生产产品，并将产品转交给用户
     function produce()
         public
-        RequireRawMaterialState
-        RequireSufficientBalance(getTotalPrice())
+        requireRawMaterialState
+        requireSufficientBalance(getTotalPrice())
     {
         // 调用原材料合约，购买原材料
         for (uint i = 0; i < rawMaterialsCount; i++) {
@@ -228,11 +233,11 @@ contract Warehouse is User {
         _;
     }
 
-    event ProductPurchased(address indexed warehouseAddress, uint totalPrice);
+    event ProductPurchased(address warehouseAddress, uint totalPrice);
 
     // 外部用户调用，购买产品
     function buyProduct(uint _money) public {
-        require(amount > 0, "Insufficient amount")
+        require(amount > 0, "Insufficient amount");
         balance += _money;
         amount--;
         setWarehouse();
@@ -267,11 +272,15 @@ contract Product {
     }
     State state;
 
+    // 添加公钥
+    bytes32 public publicKey;
+
     // 构造函数，注册产品
-    constructor(string memory _name, uint _price) public {
+    constructor(string memory _name, uint _price, bytes32 _publicKey) public {
         name = _name;
         price = _price;
         state = State.RawMaterial;
+        publicKey = _publicKey;
     }
 
     function getPrice() public view returns (uint) {
@@ -280,7 +289,6 @@ contract Product {
 
     // 查看产品状态
     function getState() public view returns (string memory) {
-        string memory _state;
         if (state == State.RawMaterial) {
             return "RawMaterial";
         } else if (state == State.Producer) {
@@ -313,7 +321,7 @@ contract Consumer {
     uint balance;
 
     // 事件：用户购买商品
-    event ProductPurchased(address indexed consumerAddress, uint totalPrice);
+    event ProductPurchased(address consumerAddress, uint totalPrice);
 
     // 构造函数，注册用户
     constructor(string memory _name, uint _balance) public {
@@ -330,7 +338,7 @@ contract Consumer {
         Product product = Product(_productAddress);
         uint price = product.getPrice();
         require(balance >= price, "Insufficient balance");
-        Warehouse warehouse = Warehouse(_address);
+        Warehouse warehouse = Warehouse(_WarehouseAddress);
         warehouse.buyProduct(_money);
         amount++;
         balance -= _money;
