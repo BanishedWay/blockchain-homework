@@ -98,7 +98,6 @@ contract Producers is User {
         uint _balance
     ) public User(_name, _balance) {
         productAddress = _address;
-        
     }
 
     // 事件：产品创建完成
@@ -118,9 +117,13 @@ contract Producers is User {
 
     // 用户输入原材料名称和所需个数，添加到映射中
     function addRawMaterial(string memory _name, uint _amount) public {
-        rawMaterials[_name] = _amount;
-        rawMaterialsName.push(_name);
-        rawMaterialsCount++;
+        if (rawMaterials[_name] > 0) {
+            rawMaterials[_name] += _amount;
+        } else {
+            rawMaterials[_name] = _amount;
+            rawMaterialsName.push(_name);
+            rawMaterialsCount++;
+        } // 如果原材料已经存在，数量相加
     }
 
     // 用户输入原材料名称和供应商地址，添加到映射中
@@ -137,17 +140,6 @@ contract Producers is User {
         _;
     }
 
-    // 修饰符：要求产品状态必须为原材料状态
-    modifier requireRawMaterialState() {
-        Product product = Product(productAddress);
-        require(
-            keccak256(abi.encodePacked(product.getState())) ==
-                keccak256(abi.encodePacked("RawMaterial")),
-            "Product not in raw material state"
-        );
-        _;
-    }
-
     // 修饰符：生产之前，检查用户余额是否足够
     modifier requireSufficientBalance(uint _price) {
         require(balance >= _price, "Insufficient balance");
@@ -155,7 +147,7 @@ contract Producers is User {
     }
 
     // 获取总原材料成本
-    function getTotalPrice() public view returns (uint) {
+    function getTotalPrice() private view returns (uint) {
         uint totalPrice = 0;
         for (uint i = 0; i < rawMaterialsCount; i++) {
             totalPrice +=
@@ -181,20 +173,21 @@ contract Producers is User {
     }
 
     // 生产函数，用户调用改函数，生产产品，并将产品转交给用户
-    function produce()
-        public
-        requireRawMaterialState
-        requireSufficientBalance(getTotalPrice())
-    {
+    function produce() external requireSufficientBalance(getTotalPrice()) {
         // 调用原材料合约，购买原材料
         for (uint i = 0; i < rawMaterialsCount; i++) {
             purchaseRawMaterial(rawMaterialsName[i]);
         }
+
         // 生产产品
         setProduce();
 
         // 触发产品创建完成事件
         emit ProductCreated(name, getTotalPrice());
+    }
+
+    function addPrice(uint _money) public {
+        balance += _money;
     }
 
     function setProduce() private {
@@ -232,22 +225,27 @@ contract Warehouse is User {
     event ProductPurchased(address warehouseAddress, uint totalPrice);
 
     // 外部用户调用，购买产品
-    function buyProduct(uint _money) public {
-        require(amount > 0, "Insufficient amount");
+    function buyProduct(uint _money) external {
+        require(amount > 0, "Insufficient product amount");
         balance += _money;
         amount--;
-        setWarehouse();
 
         // 触发产品购买事件
         emit ProductPurchased(address(this), _money);
     }
 
     // 调用生产者合约，生成产品
-    function produceProduct(address _address) public requireSufficientBalance {
-        Producers producer = Producers(_address);
+    function produceProduct(
+        address _producerAddress,
+        uint _price
+    ) public requireSufficientBalance {
+        Producers producer = Producers(_producerAddress);
         producer.produce();
+        producer.addPrice(_price);
         amount++;
         balance -= price;
+
+        setWarehouse();
     }
 
     // 设置产品状态
@@ -268,15 +266,11 @@ contract Product {
     }
     State state;
 
-    // 添加公钥
-    bytes32 public publicKey;
-
     // 构造函数，注册产品
-    constructor(string memory _name, uint _price, bytes32 _publicKey) public {
+    constructor(string memory _name, uint _price) public {
         name = _name;
         price = _price;
         state = State.RawMaterial;
-        publicKey = _publicKey;
     }
 
     function getPrice() public view returns (uint) {
@@ -312,7 +306,7 @@ contract Product {
 
 contract Consumer {
     string name;
-    address user;
+    address productAddress;
     uint amount;
     uint balance;
 
@@ -320,35 +314,49 @@ contract Consumer {
     event ProductPurchased(address consumerAddress, uint totalPrice);
 
     // 构造函数，注册用户
-    constructor(string memory _name, uint _balance) public {
+    constructor(
+        string memory _name,
+        uint _balance,
+        address _productAddress
+    ) public {
         name = _name;
         balance = _balance;
+        productAddress = _productAddress;
+    }
+
+    // 修饰符：要求产品状态必须为原材料状态
+    modifier requireRawMaterialState() {
+        Product product = Product(productAddress);
+        require(
+            keccak256(abi.encodePacked(product.getState())) !=
+                keccak256(abi.encodePacked("RawMaterial")),
+            "Product is in raw material state"
+        );
+        _;
     }
 
     // 购买函数，用户调用函数，购买产品
     function buyProduct(
         address _WarehouseAddress,
-        address _productAddress,
         uint _money
-    ) public {
-        Product product = Product(_productAddress);
-        uint price = product.getPrice();
-        require(balance >= price, "Insufficient balance");
+    ) public requireRawMaterialState {
         Warehouse warehouse = Warehouse(_WarehouseAddress);
         warehouse.buyProduct(_money);
         amount++;
         balance -= _money;
 
+        setConsumer(productAddress);
+
         emit ProductPurchased(address(this), _money);
     }
 
-    function setConsumer(address _address) public {
+    function setConsumer(address _address) private {
         Product product = Product(_address);
         product.setState(3);
     }
 
-    function getState(address _address) public view returns (string memory) {
-        Product product = Product(_address);
+    function getState() public view returns (string memory) {
+        Product product = Product(productAddress);
         return product.getState();
     }
 }
