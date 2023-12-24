@@ -90,7 +90,6 @@ contract RawMaterialSupplier is User {
 
 contract Producers is User {
     address productAddress;
-    address signer;
 
     // 构造函数，注册生产者
     constructor(
@@ -99,10 +98,7 @@ contract Producers is User {
         uint _balance
     ) public User(_name, _balance) {
         productAddress = _address;
-        signer = 0x0000000000000000000000000000000000000000;// TODO 完成签名
-        // r: 0x1234567890123456789012345678901234567890123456789012345678901234
-        // s: 0x5678901234567890123456789012345678901234567890123456789012345678
-        // v: 27
+        
     }
 
     // 事件：产品创建完成
