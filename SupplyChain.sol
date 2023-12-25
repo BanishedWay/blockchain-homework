@@ -146,6 +146,17 @@ contract Producers is User {
         _;
     }
 
+    // 修饰符：要求产品状态必须为原材料状态
+    modifier requireRawMaterialState() {
+        Product product = Product(productAddress);
+        require(
+            keccak256(abi.encodePacked(product.getState())) ==
+                keccak256(abi.encodePacked("RawMaterial")),
+            "Product is not in raw material state"
+        );
+        _;
+    }
+
     // 获取总原材料成本
     function getTotalPrice() private view returns (uint) {
         uint totalPrice = 0;
@@ -172,8 +183,12 @@ contract Producers is User {
         balance -= money;
     }
 
-    // 生产函数，用户调用改函数，生产产品，并将产品转交给用户
-    function produce() external requireSufficientBalance(getTotalPrice()) {
+    // 生产函数，用户调用该函数，生产产品，并将产品转交给用户
+    function produce()
+        external
+        requireRawMaterialState
+        requireSufficientBalance(getTotalPrice())
+    {
         // 调用原材料合约，购买原材料
         for (uint i = 0; i < rawMaterialsCount; i++) {
             purchaseRawMaterial(rawMaterialsName[i]);
@@ -186,7 +201,7 @@ contract Producers is User {
         emit ProductCreated(name, getTotalPrice());
     }
 
-    function addPrice(uint _money) public {
+    function addPrice(uint _money) external {
         balance += _money;
     }
 
@@ -216,12 +231,6 @@ contract Warehouse is User {
         _;
     }
 
-    // 修饰符：在转移之前检查数量是否足够
-    modifier requireSufficientAmount() {
-        require(amount > 0, "Insufficient amount");
-        _;
-    }
-
     event ProductPurchased(address warehouseAddress, uint totalPrice);
 
     // 外部用户调用，购买产品
@@ -234,7 +243,7 @@ contract Warehouse is User {
         emit ProductPurchased(address(this), _money);
     }
 
-    // 调用生产者合约，生成产品
+    // 调用生产者合约，生产产品
     function produceProduct(
         address _producerAddress,
         uint _price
@@ -245,7 +254,7 @@ contract Warehouse is User {
         amount++;
         balance -= price;
 
-        setWarehouse();// TODO 检查并截图
+        setWarehouse();
     }
 
     // 设置产品状态
@@ -324,22 +333,8 @@ contract Consumer {
         productAddress = _productAddress;
     }
 
-    // 修饰符：要求产品状态必须为原材料状态
-    modifier requireRawMaterialState() {
-        Product product = Product(productAddress);
-        require(
-            keccak256(abi.encodePacked(product.getState())) !=
-                keccak256(abi.encodePacked("RawMaterial")),
-            "Product is in raw material state"
-        );
-        _;
-    }
-
     // 购买函数，用户调用函数，购买产品
-    function buyProduct(
-        address _WarehouseAddress,
-        uint _money
-    ) public requireRawMaterialState {
+    function buyProduct(address _WarehouseAddress, uint _money) public {
         Warehouse warehouse = Warehouse(_WarehouseAddress);
         warehouse.buyProduct(_money);
         amount++;
